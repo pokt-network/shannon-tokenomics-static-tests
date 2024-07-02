@@ -1,0 +1,76 @@
+Chain,Earn AVG,Network,Change,Relays,Active Nodes
+Polygon Mainnet (0009),2.4,18%,1.2%,"95,595,795","13,799"
+Ethereum (0021),2.21,17.2%,7.5%,"91,100,564","14,574"
+Solana Custom (C006),22.13,12.6%,22.7%,"66,925,828","1,268"
+BSC Mainnet (0004),0.93,6.9%,0.3%,"36,855,174","13,695"
+Base Mainnet (0079),1.43,5.7%,5.5%,"30,067,193","8,336"
+POKT Mainnet (0001),0.73,3.4%,0.3%,"18,149,176","7,288"
+FUSE Mainnet (0005),0.41,3%,8.9%,"15,745,075","11,380"
+Klaytn Mainnet (0056),0.49,2.6%,6.7%,"13,965,772","9,458"
+Arbitrum One (0066),0.37,2.2%,7.4%,"11,688,693","10,013"
+Ethereum Archival (0022),0.44,2.1%,46.6%,"11,000,360","8,062"
+DFKchain Subnet (03DF),0.33,2%,10.7%,"10,592,068","9,315"
+Polygon zkEVM (0074),0.78,1.8%,0.6%,"9,772,465","5,232"
+Optimism Mainnet (0053),0.57,1.8%,28.6%,"9,566,661","6,446"
+Sui Mainnet (0076),1.8,1.5%,6.2%,"8,055,323","1,918"
+Scroll Mainnet (0082),0.99,1.5%,9.3%,"7,821,008","3,383"
+Harmony Shard 0 (0040),0.39,1.4%,3.9%,"7,546,462","7,305"
+Amoy Testnet Archival (A085),0.69,1.3%,29.2%,"6,802,032","3,672"
+Fantom (0049),0.22,1.3%,0.7%,"6,674,589","9,173"
+Polygon Archival (000B),0.69,1.1%,0.1%,"5,812,028","3,344"
+Holesky Testnet (0081),1.21,1%,4.2%,"5,425,180","1,927"
+Optimism Archival (A053),0.82,1%,1%,"5,278,128","2,669"
+Celo Mainnet (0065),0.29,1%,0.4%,"5,180,459","4,728"
+NEAR Mainnet (0052),0.5,0.9%,5.5%,"4,537,911","3,685"
+Gnosis - xDai (0027),0.17,0.8%,2.6%,"4,437,229","7,482"
+Arbitrum Sepolia Archival (A086),0.67,0.8%,0.4%,"4,193,342","2,550"
+Avalanche Mainnet (0003),0.16,0.7%,5.6%,"3,497,193","5,369"
+Solana Mainnet (0006),0.6,0.5%,0.5%,"2,904,803","2,087"
+Metis Mainnet (0058),0.44,0.4%,2.5%,"2,342,734","1,934"
+Gnosis - xDAI Archival (000C),1.05,0.4%,0.9%,"2,322,666",791
+Kava Mainnet (0071),0.15,0.4%,1.6%,"2,143,466","2,698"
+ETH Archival Trace (0028),0.16,0.3%,2.7%,"1,831,711","2,824"
+Celestia Archival (A0CA),0.77,0.3%,7.9%,"1,698,144",734
+Optimism Sepolia Archival (A087),0.58,0.3%,14%,"1,622,892",996
+Moonbeam Mainnet (0050),0.3,0.3%,0.8%,"1,569,958",603
+Boba Mainnet (0048),1.01,0.3%,1%,"1,423,961",612
+IoTeX Mainnet (0044),0.38,0.3%,0.5%,"1,399,671","1,117"
+Oasys Archival (0069),0.8,0.3%,6.3%,"1,394,841",597
+Base Testnet (0080),0.25,0.3%,3.6%,"1,379,889","1,820"
+BSC Archival (0010),0.27,0.3%,1.3%,"1,355,639","2,027"
+Avalanche Archival (A003),0.78,0.2%,3.8%,"1,308,259",573
+Oasys Mainnet (0070),0.96,0.2%,10.5%,"1,260,712",561
+OEC Mainnet (0047),0.38,0.2%,0.3%,"1,245,414","1,260"
+Osmosis Mainnet (0054),0.61,0.2%,3.2%,"1,240,100",862
+Moonriver Mainnet (0051),0.16,0.2%,2.9%,"1,124,442","1,926"
+Kava Archival (0072),0.83,0.2%,3.5%,"1,032,135",425
+Fraxtal Archival (A088),0.38,0.2%,12.1%,"961,024","1,077"
+Evmos Mainnet (0046),0.08,0.2%,0.2%,"879,503","1,713"
+Scroll Testnet (0075),0.61,0.2%,0.2%,"836,673",576
+Sepolia Testnet (0077),0.17,0.1%,31.4%,"465,704","1,145"
+Sepolia Archival (0078),0.2,0.1%,14.6%,"302,978",649
+FUSE Archival (000A),-,-,-,-,-
+Polygon Mumbai (000F),-,-,-,-,-
+BSC Testnet Archival (0012),-,-,-,-,-
+Ethereum Kovan (0024),-,-,-,-,-
+Ethereum Rinkeby (0025),-,-,-,-,-
+Ethereum Goerli (0026),-,-,-,-,-
+Meter Mainnet (0057),-,-,-,-,-
+Dogechain Mainnet (0059),-,-,-,-,-
+Starknet Mainnet (0060),-,-,-,-,-
+Starknet Testnet (0061),-,-,-,-,-
+Goerli Archival (0063),-,-,-,-,-
+Velas Mainnet (0067),-,-,-,-,-
+Velas Archival (0068),-,-,-,-,-
+Radix Mainnet (0083),-,-,-,-,-
+zkSync Era (0084),-,-,-,-,-
+Taiko Katla Testnet (7A10),-,-,-,-,-
+POKT Mainnet Archival (A001),-,-,-,-,-
+A089,-,-,-,-,-
+Blast Archival (A090),-,-,-,-,-
+Celestia Consensus Archival (A0CB),-,-,-,-,-
+Celestia Testnet DA Archival (A0CC),-,-,-,-,-
+Celestia Testnet Consensus Archival (A0CD),-,-,-,-,-
+Ethereum Beacon (B021),-,-,-,-,-
+Holesky Beacon (B081),-,-,-,-,-
+Experimental (BE2A),-,-,-,-,-
