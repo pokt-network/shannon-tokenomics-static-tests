@@ -252,8 +252,10 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
             result_dict['Chains'][row['Chain']]['mint_boost_sources'] = row['reward_sources_boost']
             # Total mint
             result_dict['Chains'][row['Chain']]['mint_total'] = result_dict['Chains'][row['Chain']]['mint_base'] + result_dict['Chains'][row['Chain']]['mint_boost_sources']
-            # Calcualte the minting per node in this service
+            # Calculate the minting per node in this service
             result_dict['Chains'][row['Chain']]['mint_per_node'] = result_dict['Chains'][row['Chain']]['mint_base']/row['Active Nodes']
+            # Calculate the imbalance
+            result_dict['Chains'][row['Chain']]['service_imbalance'] = (row['Total CUs']/row['Active Nodes'])/(daily_CUs/network_macro['supplier nodes'])
 
             # Add to the global accumulators (all services)
             result_dict['Total_Mint'] += result_dict['Chains'][row['Chain']]['mint_total']

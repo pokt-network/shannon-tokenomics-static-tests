@@ -141,6 +141,8 @@ def limit_compute_by_node(compute_node_chain, global_compute_node_average, diffi
     '''
     return (compute_node_chain if global_compute_node_average > compute_node_chain else global_compute_node_average)*difficulty_factor
 
+def cap_cuttm_per_node(adjusted_CUTTM, base_CUTTM, cap_mult = 5):
+    return adjusted_CUTTM if adjusted_CUTTM < cap_mult*base_CUTTM else cap_mult*base_CUTTM
 
 ################################################################################
 # ----- PANDAS PROCESS FUNCTION ----- 
@@ -173,6 +175,7 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
     result_dict['Total_Burn'] = 0
     result_dict['Total_Mint_base'] = 0
     result_dict['Total_Mint_others'] = 0
+    
 
     # Get a hard copy of the original data
     data_df = deepcopy(data_df)
@@ -231,18 +234,44 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
     CUTTM_use = CUTTM_base[0]
 
 
-    # Calculate entropy of the network
-    computed_units_by_chain = data_df['Relays'].values  *  data_df['Compute Cost'].values
-    node_by_chain = data_df['Active Nodes'].values
-    relays_node_by_chain_norm = get_computed_units_by_node_distribution(computed_units_by_chain, node_by_chain)
-    # Calcualte the per-service entropy correction values
-    entropy_correction, max_entropy = calculate_entropy_correction_values(relays_node_by_chain_norm)
-    data_df['Entropy Correction'] = entropy_correction
+    # --------------------------------------------------------------------------
+    # Entropy Normalization on Nodes Per Service
+    # --------------------------------------------------------------------------
 
-    # Global compute unit per node average
-    global_compute_node_average = (data_df['Relays']  *  data_df['Compute Cost']).sum()/data_df['Active Nodes'].sum()
-    
+    if params.get('Apply Entropy', True):
+        # Calculate entropy of the network
+        computed_units_by_chain = data_df['Relays'].values  *  data_df['Compute Cost'].values
+        node_by_chain = data_df['Active Nodes'].values
+        relays_node_by_chain_norm = get_computed_units_by_node_distribution(computed_units_by_chain, node_by_chain)
+        # Calculate the per-service entropy correction values
+        entropy_correction, max_entropy = calculate_entropy_correction_values(relays_node_by_chain_norm)
+        data_df['Entropy Correction'] = entropy_correction
+        # Global compute unit per node average
+        global_compute_node_average = (data_df['Relays']  *  data_df['Compute Cost']).sum()/data_df['Active Nodes'].sum()
+
+            
+    # --------------------------------------------------------------------------
     # Calculate each service in the network
+    # --------------------------------------------------------------------------
+
+    # Calculate computed units per node for this service
+    data_df['CU per Node'] = data_df['Relays']*data_df['Compute Cost']/data_df['Active Nodes']
+
+    # Calculate Adjusted CUTTM on each node
+    if params.get('Apply Entropy', True):
+        # Limit this value to the global average
+        data_df['CU per Node Capped'] = data_df['CU per Node'].apply(lambda x: limit_compute_by_node(x, global_compute_node_average))
+        # Adjust the CUTTM using the entropy correction value for this service
+        data_df['Adjusted CUTTM'] = CUTTM_use*data_df['Entropy Correction'] 
+        # Set a hard cap for the CUTTM, it is not enforced normally but it is not a bad idea to have.
+        data_df['Adjusted CUTTM'] = data_df['Adjusted CUTTM'].apply(lambda x: cap_cuttm_per_node(x, CUTTM_use))
+    else:
+        data_df['CU per Node Capped'] = data_df['CU per Node']
+        data_df['Adjusted CUTTM'] = CUTTM_use
+
+    # Calculate total minted in each service
+    data_df['total minted chain'] = data_df['Adjusted CUTTM']*data_df['CU per Node Capped']*data_df['Active Nodes']
+        
     for idx, row in data_df.iterrows():
 
         if row['Relays'] > 0:
@@ -250,29 +279,19 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
             # Results entry for this service
             result_dict['Chains'][row['Chain']] = dict()
 
-            # Calculate computed units per node for this service
-            cu_per_node = row['Relays']*row['Compute Cost']/row['Active Nodes']
-            # Limit this value to the global average
-            relays_per_node_use = limit_compute_by_node(cu_per_node, global_compute_node_average)
-            # Adjust the CUTTM using the entropy correction value for this service
-            adjusted_CUTTM = CUTTM_use*row['Entropy Correction'] 
-            # Set a hard cap for the CUTTM, it is not enforced normally but it is not a bad idea to have.
-            adjusted_CUTTM = adjusted_CUTTM if adjusted_CUTTM < 5*CUTTM_use else 5*CUTTM_use
-
-            # Calculate total minted in this service
-            total_minted_chain = adjusted_CUTTM*relays_per_node_use*row['Active Nodes']
-
             ##### Complete the results entry
             # How much we minted here due to work
-            result_dict['Chains'][row['Chain']]['mint_base'] = total_minted_chain
+            result_dict['Chains'][row['Chain']]['mint_base'] = row['total minted chain']
             # How much we burnt here
             result_dict['Chains'][row['Chain']]['burn_total'] = GFPCU_use*row['Relays']*row['Compute Cost']
             # How much extra we mint for sources
-            result_dict['Chains'][row['Chain']]['mint_boost_sources'] = 0 #shane.get_minted_chain_champ(row['Relays'], relays_use, price_use)
+            result_dict['Chains'][row['Chain']]['mint_boost_sources'] = 0 # TODO: I have not created this yet, not sure which are the requirements.
             # Total mint
-            result_dict['Chains'][row['Chain']]['mint_total'] = total_minted_chain +result_dict['Chains'][row['Chain']]['mint_boost_sources']
-            # Calcualte the minting per node in this service
-            result_dict['Chains'][row['Chain']]['mint_per_node'] = total_minted_chain/row['Active Nodes']
+            result_dict['Chains'][row['Chain']]['mint_total'] = row['total minted chain'] +result_dict['Chains'][row['Chain']]['mint_boost_sources']
+            # Calculate the minting per node in this service
+            result_dict['Chains'][row['Chain']]['mint_per_node'] = row['total minted chain']/row['Active Nodes']
+            # Calculate the imbalance
+            result_dict['Chains'][row['Chain']]['service_imbalance'] = row['CU per Node']/global_compute_node_average
 
             # Add to the global accumulators (all services)
             result_dict['Total_Mint'] += result_dict['Chains'][row['Chain']]['mint_total']
