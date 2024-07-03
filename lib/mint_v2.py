@@ -246,8 +246,8 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
         # Calculate the per-service entropy correction values
         entropy_correction, max_entropy = calculate_entropy_correction_values(relays_node_by_chain_norm)
         data_df['Entropy Correction'] = entropy_correction
-        # Global compute unit per node average
-        global_compute_node_average = (data_df['Relays']  *  data_df['Compute Cost']).sum()/data_df['Active Nodes'].sum()
+    # Global compute unit per node average
+    global_compute_node_average = (data_df['Relays']  *  data_df['Compute Cost']).sum()/data_df['Active Nodes'].sum()
 
             
     # --------------------------------------------------------------------------
