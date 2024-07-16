@@ -35,7 +35,7 @@ env_source:  ## Source the env; must be execute like so: $(make env_source)
 
 .PHONY: pip_freeze
 pip_freeze: check-env ## Freeze the pip requirements
-	pip freeze > requirements.txt
+	pip freeze -l > requirements.txt
 
 .PHONY: pip_install
 pip_install: check-env ## Install the pip requirements
