@@ -182,8 +182,12 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
     result_dict['Chains'] = dict()
     result_dict['Total_Mint'] = 0
     result_dict['Total_Burn'] = 0
-    result_dict['Total_Mint_base'] = 0
-    result_dict['Total_Mint_others'] = 0
+    # result_dict['Total_Mint_base'] = 0
+    # result_dict['Total_Mint_others'] = 0
+    result_dict['Total_Mint_DAO'] = 0
+    result_dict['Total_Mint_Validator'] = 0
+    result_dict['Total_Mint_Supplier'] = 0
+    result_dict['Total_Mint_Source'] = 0
 
     # Get a hard copy of the original data
     data_df = deepcopy(data_df)
@@ -260,8 +264,12 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
             # Add to the global accumulators (all services)
             result_dict['Total_Mint'] += result_dict['Chains'][row['Chain']]['mint_total']
             result_dict['Total_Burn'] += result_dict['Chains'][row['Chain']]['burn_total']
-            result_dict['Total_Mint_base'] += result_dict['Chains'][row['Chain']]['mint_base']
-            result_dict['Total_Mint_others'] += result_dict['Chains'][row['Chain']]['mint_boost_sources']
+            # result_dict['Total_Mint_base'] += result_dict['Chains'][row['Chain']]['mint_base']
+            # result_dict['Total_Mint_others'] += result_dict['Chains'][row['Chain']]['mint_boost_sources']
+            result_dict['Total_Mint_DAO'] += network_macro["mint_share"]["DAO"]*result_dict['Chains'][row['Chain']]['burn_total'] + row['DAO']
+            result_dict['Total_Mint_Validator'] += network_macro["mint_share"]["Validator"]*result_dict['Chains'][row['Chain']]['burn_total'] + row['Validators']
+            result_dict['Total_Mint_Supplier'] += network_macro["mint_share"]["Supplier"]*result_dict['Chains'][row['Chain']]['burn_total'] + row['Suppliers']
+            result_dict['Total_Mint_Source'] += network_macro["mint_share"]["Source"]*result_dict['Chains'][row['Chain']]['burn_total'] + row['reward_sources_boost']
         
 
     return data_df, result_dict
