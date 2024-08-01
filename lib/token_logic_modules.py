@@ -1,6 +1,7 @@
 from copy import deepcopy
 from typing import Optional, Tuple
 
+import boost
 import math_utils
 import numpy as np
 import pandas as pd
@@ -20,14 +21,17 @@ import pandas as pd
 
 def get_compute_units_by_node_distribution(
     compute_units_by_service: np.ndarray, nodes_by_service: np.ndarray, regularization_mask=Optional[np.ndarray]
-):
+) -> np.ndarray:
     """
     Compute the distribution of compute units along the nodes in the network.
 
-    Modifying this distribution with a custom mask will provide normalization for harder chains.
-    If a chain is harder and we want to accept a higher number of compute units per node, then we just divide
-    the corresponding bin by a factor, then the entropy will think it is under-provisioned and keep giving it bonus
-    util we reach the expected value.
+    Modifying this distribution with a custom mask will provide normalization for "harder" chains.
+    "Harder" means the chain has not reached equilibrium which means it needs more incentives from the network,
+
+    If a chain is harder:
+        1. We want to accept a higher number of compute units per node
+        2. Divide the corresponding bin by a factor
+        3. Entropy will "think" it is under-provisioned and give it a bonus until we reach the expected value.
     """
     assert len(nodes_by_service) == len(compute_units_by_service)
 
@@ -36,37 +40,34 @@ def get_compute_units_by_node_distribution(
     else:
         regularization_mask = np.ones_like(nodes_by_service)
 
-    r_by_c = compute_units_by_service / nodes_by_service
-    r_by_c *= regularization_mask
-    return r_by_c / np.sum(r_by_c)
+    cu_per_node = compute_units_by_service / nodes_by_service
+    cu_per_node *= regularization_mask
+    return cu_per_node / np.sum(cu_per_node)
 
 
-def calculate_entropy_correction_values(dist_to_norm):
+def calculate_entropy_correction_values(dist_to_norm: np.ndarray) -> np.ndarray:
     """
-    Calculates the entropy values for all services given the distance to
-    uniform distribution per service.
+    Calculates the entropy values for all services given the distance to uniform distribution per service.
     """
     entropy_bin = -(dist_to_norm * np.log2(dist_to_norm))
     num_bins = dist_to_norm.shape[0]
     max_entropy = np.sum(entropy_bin)
-    return entropy_bin * num_bins / max_entropy, max_entropy
+    return entropy_bin * num_bins / max_entropy
 
 
-def limit_compute_by_node(compute_node_chain, global_compute_node_average, difficulty_factor=1.0):
+def limit_compute_by_node(compute_node_chain: np.ndarray, global_compute_node_average: np.ndarray) -> np.ndarray:
     """
-    We want to limit the rewards to under-provisioned chains and let the entropy factor be the only
-    source of "boost". If we do not do this, the under-provisioned chains get too much rewards
-    and they are the easier to game.
+    Limit rewards for under-provisioned chains.
 
-    TODO : just as in "get_compute_units_by_node_distribution", a mask can be used here to normalize.
+    We need to limit the rewards to under-provisioned chains and let the entropy factor be the only source of "boost".
+
+    If we do not do this, the under-provisioned chains get too many rewards and and they are the easier to game.
     """
-    return (
-        compute_node_chain if global_compute_node_average > compute_node_chain else global_compute_node_average
-    ) * difficulty_factor
+    return compute_node_chain if global_compute_node_average > compute_node_chain else global_compute_node_average
 
 
-def cap_cuttm_per_node(adjusted_CUTTM, base_CUTTM, cap_mult=5):
-    return adjusted_CUTTM if adjusted_CUTTM < cap_mult * base_CUTTM else cap_mult * base_CUTTM
+def cap_cuttm_per_node(adjusted_CUTTM, base_CUTTM, cap_multiplier=5):
+    return adjusted_CUTTM if adjusted_CUTTM < cap_multiplier * base_CUTTM else cap_multiplier * base_CUTTM
 
 
 ################################################################################
@@ -74,11 +75,9 @@ def cap_cuttm_per_node(adjusted_CUTTM, base_CUTTM, cap_mult=5):
 ################################################################################
 
 
-def network_state_calculation(
-    chains_df: pd.DataFrame, network_macro: dict, apply_entropy: bool
-) -> Tuple[pd.DataFrame, dict]:
+def global_network_state_calculation(chains_df: pd.DataFrame, network_macro: dict) -> Tuple[pd.DataFrame, dict]:
     """
-    Calculates parameters that provide a global view of the network.
+    Calculates parameters that provide a global view of the network, updating both chains_df and network_macro.
 
     The results of these values are used by various functions & modules throughout.
     """
@@ -98,29 +97,8 @@ def network_state_calculation(
     # Entropy Normalization on Nodes Per Service
     # --------------------------------------------------------------------------
 
-    # Calculate Adjusted CUTTM on each node
-    if apply_entropy:
-        # Calculate entropy of the network
-        compute_units_by_chain = chains_df["relays"].values * chains_df["cu_per_relay"].values
-        nodes_by_chain = chains_df["active_nodes"].values
-        relays_node_by_chain_norm = get_compute_units_by_node_distribution(compute_units_by_chain, nodes_by_chain)
-        # Calculate the per-service entropy correction values
-        entropy_correction, max_entropy = calculate_entropy_correction_values(relays_node_by_chain_norm)
-        chains_df["entropy_correction"] = entropy_correction
-
-        # Limit this value to the global average
-        chains_df["cu_per_node_capped"] = chains_df["cu_per_node"].apply(
-            lambda x: limit_compute_by_node(x, global_compute_node_average)
-        )
-        # Entropy correction normalization multiplier
-        chains_df["normalization_correction"] = chains_df["entropy_correction"].apply(
-            lambda x: cap_cuttm_per_node(x, 1)
-        )
-        # Average CU correction
-        chains_df["normalization_correction"] *= chains_df["cu_per_node_capped"] / chains_df["cu_per_node"]
-    else:
-        chains_df["cu_per_node_capped"] = chains_df["cu_per_node"]
-        chains_df["normalization_correction"] = 1.0
+    chains_df["cu_per_node_capped"] = chains_df["cu_per_node"]
+    chains_df["normalization_correction"] = 1.0
 
     return chains_df, network_macro
 
@@ -129,7 +107,7 @@ def core_TLM_budget(tlm_per_service_df: pd.DataFrame, network_macro: dict, param
     """
     Calculates the total amount of POKT to be minted by the core TLM.
 
-    The mint value calculated here is not the actual minted, its the amount that
+    The MINT value calculated here IS NOT the actual minted, its the amount that
     would be minted if there are no penalties or normalizations applied later.
 
     The burn calculated here is the actual value, since no normalization or
@@ -138,11 +116,11 @@ def core_TLM_budget(tlm_per_service_df: pd.DataFrame, network_macro: dict, param
 
     # Calculate the Gateway Fee Per Compute Unit
     network_macro["GFPCU"] = params["core_TLM"]["cu_cost"] / network_macro["POKT_value"]
+
     # Calculate the Compute Unit To Token Multiplier, it uses the "supply" change parameter to achieve supply attrition or growth
     network_macro["CUTTM"] = network_macro["GFPCU"] * params["core_TLM"]["supply_change"]
 
     # This is the maximum amount of tokens to mint due to the core module.
-    # (The entropy correction mechanism will not increase this amount)
     network_macro["core TLM mint budget"] = dict()
     network_macro["core TLM mint budget"]["total"] = network_macro["CUTTM"] * network_macro["total_cus"]
     # Assign per-actor
@@ -166,96 +144,6 @@ def core_TLM_budget(tlm_per_service_df: pd.DataFrame, network_macro: dict, param
         tlm_per_service_df["budget %s" % key] = network_macro["mint_share"][key] * tlm_per_service_df["core TLM budget"]
 
     return tlm_per_service_df, network_macro
-
-
-def boost_cuttm_f_CUs_nonlinear(tlm_per_service_df: pd.DataFrame, network_macro: dict, params: dict) -> pd.Series:
-    """
-    This is a basic non-linear boost functions that modifies the CUTTM as a
-    function of the CUs:
-    CUTTM = f(CU)
-
-    This is the result of separating the MINT-V2 mechanisms into stand-alone
-    modules.
-
-    Goal of this function: Trying to achieve a boost value for the CUTTM
-    Boost should be near zero when in equilibrium.
-
-    """
-
-    # Assert that the TLM config is correct
-    assert params["variables"]["x"] == "total_cus"
-    assert params["variables"]["y"] == "CUTTM"
-
-    # Calculate the non-linear parameters of this boost
-    a_param, b_param = math_utils.get_non_linear_params(
-        [params["start"]["x"], params["start"]["y"]],
-        [params["end"]["x"], params["end"]["y"]],
-    )
-    # Calculate the parameter cap
-    param_cap = None
-    if params["budget"]["type"] == "annual_supply_growth":
-        # Calculate annualized growth
-        param_cap = [
-            ((params["budget"]["value"] / 100.0) * network_macro["total_supply"]) / (network_macro["total_cus"] * 365.2)
-        ]
-    else:
-        raise ValueError('Budget type "%s" not supported' % params["budget"]["type"])
-    # Calculate the parameter to use
-    param_use = math_utils.calc_non_linear_param(
-        [network_macro[params["variables"]["x"]]],
-        a_param,
-        b_param,
-        params["end"]["x"],
-        bootstrap_start=params["start"]["x"],
-        max_param=param_cap,
-    )
-
-    # Calculate (maximum) total minted in each service
-    # The same as the core TLM (or any TLM) this value will be potentially reduced
-    return param_use * tlm_per_service_df["cu_per_node"] * tlm_per_service_df["active_nodes"]
-
-
-def boost_prop_f_CUs_sources_custom(tlm_per_service_df: pd.DataFrame, network_macro: dict, params: dict) -> pd.Series:
-    """
-    This boost is a proportional cuttm boost on top of sources boost.
-    It is intended to reflect the additional per-service boost that is applied
-    in the spreadsheet as the "sources boost" made by Shane.
-    """
-
-    assert params["variables"]["x"] == "total_cus"
-
-    # The modulation of the parameter is linear
-    a_param, b_param = math_utils.get_linear_params(
-        [params["start"]["x"], params["start"]["y"]],
-        [params["end"]["x"], params["end"]["y"]],
-    )
-    max_mint = -1
-    if params["budget"]["type"] == "annual_supply_growth":
-        # Calculate annualized growth
-        max_mint = ((params["budget"]["value"] / 100.0) * network_macro["total_supply"]) / (365.2)
-    elif params["budget"]["type"] == "POKT":
-        max_mint = params["budget"]["value"]
-    else:
-        raise ValueError('Budget type "%s" not supported' % params["budget"]["type"])
-    param_use = math_utils.calc_linear_param(
-        [network_macro[params["variables"]["x"]]],
-        a_param,
-        b_param,
-        params["end"]["x"],
-        bootstrap_start=params["start"]["x"],
-    )
-
-    # Calculate (maximum) total minted in each service
-    per_service_max = (
-        param_use * network_macro["CUTTM"] * tlm_per_service_df["cu_per_node"] * tlm_per_service_df["active_nodes"]
-    )
-    # Apply budget
-    if max_mint > 0:
-        if max_mint < per_service_max.sum():
-            # Scale values
-            per_service_max *= max_mint / per_service_max.sum()
-    # Return amount to mint in each service by this boost
-    return per_service_max
 
 
 def apply_global_limits_and_minimums(
@@ -335,8 +223,6 @@ def apply_penalties_and_normalizations(
     This function is the last step and defines the per-service minting.
     Here we take the calculated budgets for each service and apply the normalization
     correction factors.
-    For example, the normalization correction factor is the entropy correction and
-    the average CU per service cap.
     """
 
     # Calculate total minted in each service
@@ -372,14 +258,11 @@ def process(
 
     Parameters:
         chains_df          : A pandas DataFrame with all the network activity data.
-        network_macro      : A dictionary containing global data of the network, like
-                             total supply, POKT price, etc.
+        network_macro      : A dictionary containing global data of the network, like total supply, POKT price, etc.
         global_params_dict : The parameters needed to run the TLM model.
     Returns:
-        chains_df          : A pandas DataFrame with all the previous data plus some
-                             additional data calculated by the model.
-        global_params_dict : A dictionary with tokenomics data from the static
-                             execution of this model.
+        chains_df          : A pandas DataFrame with all the previous data plus some additional data calculated by the model.
+        global_params_dict : A dictionary with tokenomics data from the static execution of this model.
     """
 
     # Get a hard copy of the original data
@@ -396,40 +279,35 @@ def process(
     tlm_results["total_mint_supplier"] = 0
     tlm_results["total_mint_source"] = 0
 
-    # Calculate base network state
-    should_apply_entropy = global_params_dict.get("apply_entropy", True)
-    chains_df, network_macro = network_state_calculation(chains_df, network_macro, should_apply_entropy)
+    # Calculate global network state
+    chains_df, network_macro = global_network_state_calculation(chains_df, network_macro)
 
     # Get core TLM mint budget and total burn
     chains_df, network_macro = core_TLM_budget(chains_df, network_macro, global_params_dict)
 
     # Create data struct for boosts
-    network_macro["boost TLM mint budget"] = dict()
-    network_macro["boost TLM mint budget"]["total"] = 0
+    network_macro["boost_TLM_mint_budget"] = dict()
+    network_macro["boost_TLM_mint_budget"]["total"] = 0
     for key in network_macro["mint_share"]:
-        network_macro["boost TLM mint budget"][key] = 0
+        network_macro["boost_TLM_mint_budget"][key] = 0
 
-    # Get budget from boost TLMs
-    # This is the main feature of the TLM model, the simplicity for adding more
-    # and arbitrary mechanics
+    # Execute all TLM boosts
     for boost_tlm in global_params_dict["boost_TLM"]:
-        # Check conditions
-        skip = False
-        for condition in boost_tlm["conditions"]:
-            if (network_macro[condition["metric"]] < condition["low_threshold"]) or (
-                network_macro[condition["metric"]] > condition["high_threshold"]
+        # print(boost_tlm)
+        for condition in boost_tlm.conditions:
+            if (network_macro[condition.metric] < condition.low_threshold) or (
+                network_macro[condition.metric] > condition.high_threshold
             ):
-                skip = True
+                continue
 
-        if not skip:
-            # Get this boost budget
-            this_budget = boost_tlm["minting_func"](chains_df, network_macro, boost_tlm["parameters"])
-            assert this_budget.sum() > 0
-            # Assign to actor
-            chains_df["budget %s" % boost_tlm["recipient"]] += this_budget
-            # Track globals
-            network_macro["boost TLM mint budget"][boost_tlm["recipient"]] += this_budget
-            network_macro["boost TLM mint budget"]["total"] += this_budget
+        # Get this boost budget
+        this_budget = boost_tlm.minting_func(chains_df, network_macro, boost_tlm.parameters)
+        assert this_budget.sum() > 0
+        # Assign to actor
+        chains_df["budget %s" % boost_tlm.recipient] += this_budget
+        # Track globals
+        network_macro["boost_TLM_mint_budget"][boost_tlm.recipient] += this_budget
+        network_macro["boost_TLM_mint_budget"]["total"] += this_budget
 
     # Apply global limits and minimums to minting budget
     chains_df, network_macro = apply_global_limits_and_minimums(chains_df, network_macro, global_params_dict)
@@ -441,12 +319,13 @@ def process(
     global_compute_node_average = (chains_df["relays"] * chains_df["cu_per_relay"]).sum() / chains_df[
         "active_nodes"
     ].sum()
+
     # Calculate total minted in each service
-    chains_df["total minted chain"] = (
-        chains_df["total TLM minted DAO"]
-        + chains_df["total TLM minted Validator"]
-        + chains_df["total TLM minted Supplier"]
-        + chains_df["total TLM minted Source"]
+    chains_df["total_mint_per_chain"] = (
+        chains_df["total_mint_dao"]
+        + chains_df["total_mint_proposer"]
+        + chains_df["total_mint_supplier"]
+        + chains_df["total_mint_source"]
     )
 
     for _, row in chains_df.iterrows():
@@ -457,28 +336,29 @@ def process(
         tlm_results["chains"][row["Chain"]] = dict()
 
         ##### Complete the results entry
+
         # How much we minted here due to work
         tlm_results["chains"][row["Chain"]]["mint_base"] = row["core TLM minted"]
         # How much we burnt here
         tlm_results["chains"][row["Chain"]]["burn_total"] = row["core TLM burned"]
         # How much extra we mint for sources
         tlm_results["chains"][row["Chain"]]["mint_boost_sources"] = (
-            row["total TLM minted Source"] - network_macro["mint_share"]["Source"] * row["core TLM minted"]
+            row["total_mint_source"] - network_macro["mint_share"]["Source"] * row["core TLM minted"]
         )
         # Total mint
-        tlm_results["chains"][row["Chain"]]["mint_total"] = row["total minted chain"]
+        tlm_results["chains"][row["Chain"]]["mint_total"] = row["total_mint_per_chain"]
         # Calculate the minting per node in this service
-        tlm_results["chains"][row["Chain"]]["mint_per_node"] = row["total minted chain"] / row["active_nodes"]
+        tlm_results["chains"][row["Chain"]]["mint_per_node"] = row["total_mint_per_chain"] / row["active_nodes"]
         # Calculate the imbalance
         tlm_results["chains"][row["Chain"]]["service_imbalance"] = row["cu_per_node"] / global_compute_node_average
 
         # Add to the global accumulators (all services)
         tlm_results["total_mint"] += tlm_results["chains"][row["Chain"]]["mint_total"]
         tlm_results["total_burn"] += tlm_results["chains"][row["Chain"]]["burn_total"]
-        tlm_results["total_mint_dao"] += row["total TLM minted DAO"]
-        tlm_results["total_mint_proposer"] += row["total TLM minted Validator"]
-        tlm_results["total_mint_supplier"] += row["total TLM minted Supplier"]
-        tlm_results["total_mint_source"] += row["total TLM minted Source"]
+        tlm_results["total_mint_dao"] += row["total_mint_dao"]
+        tlm_results["total_mint_proposer"] += row["total_mint_proposer"]
+        tlm_results["total_mint_supplier"] += row["total_mint_supplier"]
+        tlm_results["total_mint_source"] += row["total_mint_source"]
 
     return chains_df, tlm_results
 
@@ -556,141 +436,142 @@ global_params_dict["core_TLM"]["cu_cost"] = 0.0000000085  # USD/CU
 # - A minting mechanism, that defines how the extra minting is calculated.
 # - A budget, that sets the maximum spending for the module.
 global_params_dict["boost_TLM"] = list()
-
-### DAO Boost
-aux_boost = dict()
-aux_boost["name"] = "DAO Boost - CU Based"
-aux_boost["recipient"] = "DAO"  # Who receives the minting
-aux_boost["conditions"] = list()  # List of conditions to meet for TLM execution
-aux_boost["conditions"].append(
-    {
-        "metric": "total_cus",  # Total CUs in the network
-        "low_threshold": 0,
-        "high_threshold": 2500 * 1e9,  # CU/day
-    }
-)
-aux_boost["minting_func"] = (
-    boost_cuttm_f_CUs_nonlinear  # A function that accepts as input the services state, the network macro state and the parameters below and return the amount to mint per service
-)
-aux_boost["parameters"] = {  # A structure containing all parameters needed by this module
-    "start": {
-        "x": 250 * 1e9,  # ComputeUnits/day
-        "y": 5e-9,  # USD/ComputeUnits
-    },
-    "end": {
-        "x": 2500 * 1e9,  # ComputeUnits/day
-        "y": 0,  # USD/ComputeUnits
-    },
-    "variables": {
-        "x": "total_cus",  # Control metric for this TLM
-        "y": "CUTTM",  # Target parameter for this TLM
-    },
-    "budget": {  # Can be a fixed number of tokens [POKT] or a percentage of total supply (annualized) [annual_supply_growth]
-        "type": "annual_supply_growth",
-        "value": 0.5,
-    },
-}
-# Append to boosts list
-global_params_dict["boost_TLM"].append(aux_boost)
-
-### Validator Boost
-aux_boost = dict()
-aux_boost["name"] = "Validator Boost - CU Based"
-aux_boost["recipient"] = "Validator"
-aux_boost["conditions"] = list()
-aux_boost["conditions"].append(
-    {"metric": "total_cus", "low_threshold": 0, "high_threshold": 2500 * 1e9}
-)  # ComputeUnits/day
-aux_boost["minting_func"] = boost_cuttm_f_CUs_nonlinear
-aux_boost["parameters"] = {  #
-    "start": {
-        "x": 250 * 1e9,  # ComputeUnits/day
-        "y": 2.5e-9,  # USD/ComputeUnits
-    },
-    "end": {
-        "x": 2500 * 1e9,  # ComputeUnits/day
-        "y": 0,  # USD/ComputeUnits
-    },
-    "variables": {
-        "x": "total_cus",  # Control metric for this TLM
-        "y": "CUTTM",  # Target parameter for this TLM
-    },
-    "budget": {"type": "annual_supply_growth", "value": 0.25},
-}
-global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
+global_params_dict["boost_TLM"].append(boost.dao_boost)
+# ### DAO Boost
+# aux_boost = dict()
+# aux_boost["name"] = "DAO Boost - CU Based"
+# aux_boost["recipient"] = "DAO"  # Who receives the minting
+# aux_boost["conditions"] = list()  # List of conditions to meet for TLM execution
+# aux_boost["conditions"].append(
+#     {
+#         "metric": "total_cus",  # Total CUs in the network
+#         "low_threshold": 0,
+#         "high_threshold": 2500 * 1e9,  # CU/day
+#     }
+# )
+# aux_boost["minting_func"] = (
+#     boost_cuttm_f_CUs_nonlinear  # A function that accepts as input the services state, the network macro state and the parameters below and return the amount to mint per service
+# )
+# aux_boost["parameters"] = {  # A structure containing all parameters needed by this module
+#     "start": {
+#         "x": 250 * 1e9,  # ComputeUnits/day
+#         "y": 5e-9,  # USD/ComputeUnits
+#     },
+#     "end": {
+#         "x": 2500 * 1e9,  # ComputeUnits/day
+#         "y": 0,  # USD/ComputeUnits
+#     },
+#     "variables": {
+#         "x": "total_cus",  # Control metric for this TLM
+#         "y": "CUTTM",  # Target parameter for this TLM
+#     },
+#     "budget": {  # Can be a fixed number of tokens [POKT] or a percentage of total supply (annualized) [annual_supply_growth]
+#         "type": "annual_supply_growth",
+#         "value": 0.5,
+#     },
+# }
+# # Append to boosts list
+# # global_params_dict["boost_TLM"].append(aux_boost)
 
 
-### Supplier Boost
-aux_boost = dict()
-aux_boost["name"] = "Supplier Boost - CU Based"
-aux_boost["recipient"] = "Supplier"
-aux_boost["metrics"] = ["total_cus"]
-aux_boost["conditions"] = list()
-aux_boost["conditions"].append({"metric": "total_cus", "low_threshold": 0, "high_threshold": 2500 * 1e9})
-aux_boost["minting_func"] = boost_cuttm_f_CUs_nonlinear
-aux_boost["parameters"] = {
-    "start": {
-        "x": 250 * 1e9,  # ComputeUnits/day
-        "y": 3.5e-8,  # USD/ComputeUnits
-    },
-    "end": {
-        "x": 2500 * 1e9,  # ComputeUnits/day
-        "y": 0,  # USD/ComputeUnits
-    },
-    "variables": {
-        "x": "total_cus",  # Control metric for this TLM
-        "y": "CUTTM",  # Target parameter for this TLM
-    },
-    "budget": {"type": "annual_supply_growth", "value": 3.5},
-}
-global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
+# ### Validator Boost
+# aux_boost = dict()
+# aux_boost["name"] = "Validator Boost - CU Based"
+# aux_boost["recipient"] = "Validator"
+# aux_boost["conditions"] = list()
+# aux_boost["conditions"].append(
+#     {"metric": "total_cus", "low_threshold": 0, "high_threshold": 2500 * 1e9}
+# )  # ComputeUnits/day
+# # aux_boost["minting_func"] = boost_cuttm_f_CUs_nonlinear
+# aux_boost["parameters"] = {  #
+#     "start": {
+#         "x": 250 * 1e9,  # ComputeUnits/day
+#         "y": 2.5e-9,  # USD/ComputeUnits
+#     },
+#     "end": {
+#         "x": 2500 * 1e9,  # ComputeUnits/day
+#         "y": 0,  # USD/ComputeUnits
+#     },
+#     "variables": {
+#         "x": "total_cus",  # Control metric for this TLM
+#         "y": "CUTTM",  # Target parameter for this TLM
+#     },
+#     "budget": {"type": "annual_supply_growth", "value": 0.25},
+# }
+# # global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
 
 
-### Source Boost
-aux_boost = dict()
-aux_boost["name"] = "Sources Boost 1 - CU Based"
-aux_boost["recipient"] = "Source"
-aux_boost["conditions"] = list()
-aux_boost["conditions"].append({"metric": "total_cus", "low_threshold": 0, "high_threshold": 2500 * 1e9})
-aux_boost["parameters"] = {
-    "start": {
-        "x": 250 * 1e9,  # ComputeUnits/day
-        "y": 7.5e-9,  # USD/ComputeUnits
-    },
-    "end": {
-        "x": 2500 * 1e9,  # ComputeUnits/day
-        "y": 0,  # USD/ComputeUnits
-    },
-    "variables": {
-        "x": "total_cus",  # Control metric for this TLM
-        "y": "CUTTM",  # Target parameter for this TLM
-    },
-    "budget": {"type": "annual_supply_growth", "value": 0.75},
-}
-aux_boost["minting_func"] = boost_cuttm_f_CUs_nonlinear
-global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
+# ### Supplier Boost
+# aux_boost = dict()
+# aux_boost["name"] = "Supplier Boost - CU Based"
+# aux_boost["recipient"] = "Supplier"
+# aux_boost["metrics"] = ["total_cus"]
+# aux_boost["conditions"] = list()
+# aux_boost["conditions"].append({"metric": "total_cus", "low_threshold": 0, "high_threshold": 2500 * 1e9})
+# aux_boost["minting_func"] = boost_cuttm_f_CUs_nonlinear
+# aux_boost["parameters"] = {
+#     "start": {
+#         "x": 250 * 1e9,  # ComputeUnits/day
+#         "y": 3.5e-8,  # USD/ComputeUnits
+#     },
+#     "end": {
+#         "x": 2500 * 1e9,  # ComputeUnits/day
+#         "y": 0,  # USD/ComputeUnits
+#     },
+#     "variables": {
+#         "x": "total_cus",  # Control metric for this TLM
+#         "y": "CUTTM",  # Target parameter for this TLM
+#     },
+#     "budget": {"type": "annual_supply_growth", "value": 3.5},
+# }
+# # global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
 
 
-### Source Boost 2 (Spreadsheet)
-aux_boost = dict()
-aux_boost["name"] = "Sources Boost 2 - Shane's"
-aux_boost["recipient"] = "Source"
-aux_boost["conditions"] = list()
-aux_boost["conditions"].append({"metric": "total_cus", "low_threshold": 0, "high_threshold": 1500 * 1e9})
-aux_boost["parameters"] = {
-    "start": {
-        "x": 5 * 1e9,  # ComputeUnits/day
-        "y": 0.9 * 0.7,  # Proportion of CUTTF
-    },
-    "end": {
-        "x": 1500 * 1e9,  # ComputeUnits/day
-        "y": 0.1 * 0.7,  # Proportion of CUTTF
-    },
-    "variables": {
-        "x": "total_cus",  # Control metric for this TLM
-        "y": "prop. CUTTM",  # Target parameter for this TLM
-    },
-    "budget": {"type": "POKT", "value": 40e3},  # POKT per day
-}
-aux_boost["minting_func"] = boost_prop_f_CUs_sources_custom
-global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
+# ### Source Boost
+# aux_boost = dict()
+# aux_boost["name"] = "Sources Boost 1 - CU Based"
+# aux_boost["recipient"] = "Source"
+# aux_boost["conditions"] = list()
+# aux_boost["conditions"].append({"metric": "total_cus", "low_threshold": 0, "high_threshold": 2500 * 1e9})
+# aux_boost["parameters"] = {
+#     "start": {
+#         "x": 250 * 1e9,  # ComputeUnits/day
+#         "y": 7.5e-9,  # USD/ComputeUnits
+#     },
+#     "end": {
+#         "x": 2500 * 1e9,  # ComputeUnits/day
+#         "y": 0,  # USD/ComputeUnits
+#     },
+#     "variables": {
+#         "x": "total_cus",  # Control metric for this TLM
+#         "y": "CUTTM",  # Target parameter for this TLM
+#     },
+#     "budget": {"type": "annual_supply_growth", "value": 0.75},
+# }
+# aux_boost["minting_func"] = boost_cuttm_f_CUs_nonlinear
+# # global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list
+
+
+# ### Source Boost 2 (Spreadsheet)
+# aux_boost = dict()
+# aux_boost["name"] = "Sources Boost 2 - Shane's"
+# aux_boost["recipient"] = "Source"
+# aux_boost["conditions"] = list()
+# aux_boost["conditions"].append({"metric": "total_cus", "low_threshold": 0, "high_threshold": 1500 * 1e9})
+# aux_boost["parameters"] = {
+#     "start": {
+#         "x": 5 * 1e9,  # ComputeUnits/day
+#         "y": 0.9 * 0.7,  # Proportion of CUTTF
+#     },
+#     "end": {
+#         "x": 1500 * 1e9,  # ComputeUnits/day
+#         "y": 0.1 * 0.7,  # Proportion of CUTTF
+#     },
+#     "variables": {
+#         "x": "total_cus",  # Control metric for this TLM
+#         "y": "prop. CUTTM",  # Target parameter for this TLM
+#     },
+#     "budget": {"type": "POKT", "value": 40e3},  # POKT per day
+# }
+# aux_boost["minting_func"] = boost_prop_f_CUs_sources_custom
+# global_params_dict["boost_TLM"].append(aux_boost)  # Append to boosts list

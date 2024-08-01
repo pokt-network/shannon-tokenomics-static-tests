@@ -289,7 +289,9 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
         data_df["Adjusted CUTTM"] = CUTTM_use
 
     # Calculate total minted in each service
-    data_df["total minted chain"] = data_df["Adjusted CUTTM"] * data_df["cu_per_node Capped"] * data_df["active_nodes"]
+    data_df["total_mint_per_chain"] = (
+        data_df["Adjusted CUTTM"] * data_df["cu_per_node Capped"] * data_df["active_nodes"]
+    )
 
     for idx, row in data_df.iterrows():
 
@@ -300,7 +302,7 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
 
             ##### Complete the results entry
             # How much we minted here due to work
-            result_dict["Chains"][row["Chain"]]["mint_base"] = row["total minted chain"]
+            result_dict["Chains"][row["Chain"]]["mint_base"] = row["total_mint_per_chain"]
             # How much we burnt here
             result_dict["Chains"][row["Chain"]]["burn_total"] = GFPCU_use * row["relays"] * row["cu_per_relay"]
             # How much extra we mint for sources
@@ -309,10 +311,10 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
             ] = 0  # TODO: I have not created this yet, not sure which are the requirements.
             # Total mint
             result_dict["Chains"][row["Chain"]]["mint_total"] = (
-                row["total minted chain"] + result_dict["Chains"][row["Chain"]]["mint_boost_sources"]
+                row["total_mint_per_chain"] + result_dict["Chains"][row["Chain"]]["mint_boost_sources"]
             )
             # Calculate the minting per node in this service
-            result_dict["Chains"][row["Chain"]]["mint_per_node"] = row["total minted chain"] / row["active_nodes"]
+            result_dict["Chains"][row["Chain"]]["mint_per_node"] = row["total_mint_per_chain"] / row["active_nodes"]
             # Calculate the imbalance
             result_dict["Chains"][row["Chain"]]["service_imbalance"] = row["cu_per_node"] / global_compute_node_average
 

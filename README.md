@@ -33,3 +33,14 @@ by downloading the `Performance` table. A sample of this data is provided in the
 - **Random_Scenarios** : This notebook tests many random network scenarios (services, relays and compute costs) and relays/nodes distributions over services on all the proposed models and then compares them head to head using several graphics.
 
 ## Olshansk TLM modules inspection
+
+## Today
+
+## How to avoid being gameable?
+
+1. All the POKT to be minted in a session should be evenly distributed amongst all the nodes in that session.
+   1. Why? To avoid gaming the system and pointing at your own node
+
+2. The delay mechanism for updating RTTM for each service.
+   1.
+

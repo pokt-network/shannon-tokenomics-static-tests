@@ -80,7 +80,7 @@ def __(base_CU_per_relay, chains_df, data_utils, relay_multiplier):
     network_macro["mint_share"]["Validator"] = 0.05
     network_macro["mint_share"]["Supplier"] = 0.7
     network_macro["mint_share"]["Source"] = 0.15
-    assert sum(network_macro["mint_share"].values()) == 1, "The mint share must sum 1 (100%%)"
+    assert sum(network_macro["mint_share"].values()) == 1, "The mint share must sum 1 (100%)"
 
     data_utils.render_tree(network_macro)
     return network_macro,
@@ -110,40 +110,38 @@ def __(network_macro, pd, tlm_results):
     for actor, results in zip(["TLM"], [tlm_results]):
         row_values = list()
         row_values.append(actor)
-        
-        # Supply growth rate
+
+        # Supply growth rate per year: (min - burn ) / supply
         row_values.append(
             ((results["total_mint"] - results["total_burn"]) * 365.25 / network_macro["total_supply"]) * 100.0
         )
-        
-        # Over-minted total
+
+        # Total new mint: min - burn
         row_values.append(results["total_mint"] - results["total_burn"])
-        
-        # POKT burnt
+
+        # Total burn: total_burn
         row_values.append(results["total_burn"])
-        
-        # Supplier monthly income in USD
+
+        # Supplier income: USD / month
         month_income_usd = (
-            # results["total_mint_base"]
-            # * network_macro["mint_share"]["Supplier"]
             results["total_mint_supplier"]
             * 30.4
             * network_macro["POKT_value"]
             / network_macro["supplier_nodes"]
         )
         row_values.append(month_income_usd)
-        
+
         # Supplier APR
         row_values.append(
             ((month_income_usd / 30.4) * 365.0 / (network_macro["POKT_stake_per_node"] * network_macro["POKT_value"]))
             * 100.0
         )
-        
+
         # Over-mint per day due to suppliers extra minting
         row_values.append(
             results["total_mint_supplier"] - results["total_burn"] * network_macro["mint_share"]["Supplier"]
         )
-        
+
         # Over-minted to sources
         row_values.append(results["total_mint_source"] - results["total_burn"] * network_macro["mint_share"]["Source"])
 
@@ -172,6 +170,21 @@ def __(network_macro, pd, tlm_results):
         results_df,
         row_values,
     )
+
+
+@app.cell
+def __():
+    return
+
+
+@app.cell
+def __():
+    return
+
+
+@app.cell
+def __():
+    return
 
 
 if __name__ == "__main__":
