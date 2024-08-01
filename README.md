@@ -20,8 +20,6 @@ This repository contains preliminary tests for the Shannon tokenomics.
     make pip_freeze
 ```
 
-###
-
 ## Source Data
 
 The data used to run this models can be gathered from [POKTscan](https://poktscan.com/).
@@ -33,3 +31,5 @@ by downloading the `Performance` table. A sample of this data is provided in the
 
 - **Tokenomics_Compare** : This notebook makes a simple comparison (a single scenario) of two proposed models.
 - **Random_Scenarios** : This notebook tests many random network scenarios (services, relays and compute costs) and relays/nodes distributions over services on all the proposed models and then compares them head to head using several graphics.
+
+## Olshansk TLM modules inspection
