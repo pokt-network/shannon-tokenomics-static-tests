@@ -207,7 +207,7 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
     result_dict["total_burn"] = 0
     # result_dict['total_mint_base'] = 0
     # result_dict['total_mint_others'] = 0
-    result_dict["total_mint_DAO"] = 0
+    result_dict["total_mint_dao"] = 0
     result_dict["total_mint_proposer"] = 0
     result_dict["total_mint_supplier"] = 0
     result_dict["total_mint_source"] = 0
@@ -332,7 +332,7 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
             result_dict["total_burn"] += result_dict["Chains"][row["Chain"]]["burn_total"]
             # result_dict['total_mint_base'] += result_dict['Chains'][row['Chain']]['mint_base']
             # result_dict['total_mint_others'] += result_dict['Chains'][row['Chain']]['mint_boost_sources']
-            result_dict["total_mint_DAO"] += (
+            result_dict["total_mint_dao"] += (
                 network_macro["mint_share"]["DAO"] * result_dict["Chains"][row["Chain"]]["burn_total"] + row["DAO"]
             )
             result_dict["total_mint_proposer"] += (

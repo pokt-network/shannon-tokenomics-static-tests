@@ -36,11 +36,16 @@ by downloading the `Performance` table. A sample of this data is provided in the
 
 ## Today
 
-## How to avoid being gameable?
+## How to avoid being gamble?
 
-1. All the POKT to be minted in a session should be evenly distributed amongst all the nodes in that session.
-   1. Why? To avoid gaming the system and pointing at your own node
+1. Distribute rewards evenly.
 
-2. The delay mechanism for updating RTTM for each service.
-   1.
+   1. How? All the POKT to be minted in a session should be evenly distributed
+      evenly amongst all the nodes in that session.
+   2. Why? To avoid gaming the system and pointing at your own node
+   3. Issues? Free loader nodes.
+   4. How do we punish free loader nodes? Will require implicit QoS.
 
+2. Delaying CUTTM (discuss more later)
+   1. How? The delay mechanism for updating RTTM for each service.
+   2. Why?

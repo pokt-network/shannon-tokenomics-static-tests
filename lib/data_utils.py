@@ -3,9 +3,9 @@ import pandas as pd
 from anytree import Node, RenderTree
 
 
-def get_chains_df(csv_path: str, relay_multiplier: float = 1.0, spreadsheet_compact: bool = False) -> pd.DataFrame:
+def get_services_df(csv_path: str, relay_multiplier: float = 1.0, spreadsheet_compact: bool = False) -> pd.DataFrame:
     """
-    Reads the CSV file containing the chains data at csv_path to return chains_df.
+    Reads the CSV file containing the chains data at csv_path to return services_df.
 
     The data is expected to follow the format of the "Performance" card from https://poktscan.com/explore?tab=chains.
     """
@@ -15,49 +15,49 @@ def get_chains_df(csv_path: str, relay_multiplier: float = 1.0, spreadsheet_comp
         return float(value.replace("%", "").replace(",", "").replace("-", "0"))
 
     # Read chain data
-    chains_df = pd.read_csv(csv_path)
-    chains_df.rename(columns={"Relays": "relays", "Active Nodes": "active_nodes"}, inplace=True)
+    services_df = pd.read_csv(csv_path)
+    services_df.rename(columns={"Relays": "relays", "Active Nodes": "active_nodes"}, inplace=True)
 
     # Cleanup the data read in
     for column in ["Earn AVG", "Network", "Change", "relays", "active_nodes"]:
-        chains_df[column] = chains_df[column].apply(to_float)
+        services_df[column] = services_df[column].apply(to_float)
 
     # Remove all chains not in this list
     if spreadsheet_compact:
-        chains_df = chains_df[chains_df["Chain"].isin(chain_list)]
+        services_df = services_df[services_df["Chain"].isin(chain_list)]
 
     # Scale the number of relays for experimentation purposes
-    chains_df["relays"] *= relay_multiplier
+    services_df["relays"] *= relay_multiplier
 
     # Filter rows where the data is empty or potentially incorrect
-    print(chains_df.columns)
-    chains_df = chains_df.loc[chains_df["active_nodes"] > 0]
-    chains_df = chains_df.loc[chains_df["relays"] > 0]
+    print(services_df.columns)
+    services_df = services_df.loc[services_df["active_nodes"] > 0]
+    services_df = services_df.loc[services_df["relays"] > 0]
 
-    # Return chains_df
-    return chains_df
+    # Return services_df
+    return services_df
 
 
 def add_compute_cost(
-    chains_df: pd.DataFrame,
+    services_df: pd.DataFrame,
     sample_type: str = "uniform",
     mean: int = 100,
     std: int = 10,
 ) -> pd.DataFrame:
     """
-    Adds a "cu_per_relay" column to chains_df.
+    Adds a "cu_per_relay" column to services_df.
 
     This is used to emulate the per-chain cost of the services, which is not yet implemented.
     """
     if sample_type == "uniform":
-        chains_df["cu_per_relay"] = mean
+        services_df["cu_per_relay"] = mean
     elif sample_type == "normal":
-        normal_dist = np.random.default_rng().normal(mean, std, len(chains_df))
-        chains_df["cu_per_relay"] = normal_dist
+        normal_dist = np.random.default_rng().normal(mean, std, len(services_df))
+        services_df["cu_per_relay"] = normal_dist
     else:
         raise ValueError(f"Unknown sample strategy: {sample_type}")
 
-    return chains_df
+    return services_df
 
 
 def render_tree(nested_dict: dict):
