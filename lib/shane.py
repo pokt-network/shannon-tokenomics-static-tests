@@ -202,7 +202,7 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
 
     # Empty result struct
     result_dict = dict()
-    result_dict["Chains"] = dict()
+    result_dict["services"] = dict()
     result_dict["total_mint"] = 0
     result_dict["total_burn"] = 0
     # result_dict['total_mint_base'] = 0
@@ -303,48 +303,48 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
         if row["relays"] > 0:
 
             # Results entry for this service
-            result_dict["Chains"][row["Chain"]] = dict()
+            result_dict["services"][row["Chain"]] = dict()
 
             # How much we burnt here
-            result_dict["Chains"][row["Chain"]]["burn_total"] = GFPCU * row["relays"] * row["cu_per_relay"]
+            result_dict["services"][row["Chain"]]["burn_total"] = GFPCU * row["relays"] * row["cu_per_relay"]
             # How much we minted here due to work
-            result_dict["Chains"][row["Chain"]]["mint_base"] = (
-                row["Suppliers"] + row["DAO"] + row["Validators"] + result_dict["Chains"][row["Chain"]]["burn_total"]
+            result_dict["services"][row["Chain"]]["mint_base"] = (
+                row["Suppliers"] + row["DAO"] + row["Validators"] + result_dict["services"][row["Chain"]]["burn_total"]
             )
             # How much extra we mint for sources
-            result_dict["Chains"][row["Chain"]]["mint_boost_sources"] = row["reward_sources_boost"]
+            result_dict["services"][row["Chain"]]["mint_boost_sources"] = row["reward_sources_boost"]
             # Total mint
-            result_dict["Chains"][row["Chain"]]["mint_total"] = (
-                result_dict["Chains"][row["Chain"]]["mint_base"]
-                + result_dict["Chains"][row["Chain"]]["mint_boost_sources"]
+            result_dict["services"][row["Chain"]]["mint_total"] = (
+                result_dict["services"][row["Chain"]]["mint_base"]
+                + result_dict["services"][row["Chain"]]["mint_boost_sources"]
             )
             # Calculate the minting per node in this service
-            result_dict["Chains"][row["Chain"]]["mint_per_node"] = (
-                result_dict["Chains"][row["Chain"]]["mint_base"] / row["active_nodes"]
+            result_dict["services"][row["Chain"]]["mint_per_node"] = (
+                result_dict["services"][row["Chain"]]["mint_base"] / row["active_nodes"]
             )
             # Calculate the imbalance
-            result_dict["Chains"][row["Chain"]]["service_imbalance"] = (row["Total CUs"] / row["active_nodes"]) / (
+            result_dict["services"][row["Chain"]]["service_imbalance"] = (row["Total CUs"] / row["active_nodes"]) / (
                 daily_CUs / network_macro["supplier_nodes"]
             )
 
             # Add to the global accumulators (all services)
-            result_dict["total_mint"] += result_dict["Chains"][row["Chain"]]["mint_total"]
-            result_dict["total_burn"] += result_dict["Chains"][row["Chain"]]["burn_total"]
+            result_dict["total_mint"] += result_dict["services"][row["Chain"]]["mint_total"]
+            result_dict["total_burn"] += result_dict["services"][row["Chain"]]["burn_total"]
             # result_dict['total_mint_base'] += result_dict['services'][row['Chain']]['mint_base']
             # result_dict['total_mint_others'] += result_dict['services'][row['Chain']]['mint_boost_sources']
             result_dict["total_mint_dao"] += (
-                network_macro["mint_share"]["DAO"] * result_dict["Chains"][row["Chain"]]["burn_total"] + row["DAO"]
+                network_macro["mint_share"]["DAO"] * result_dict["services"][row["Chain"]]["burn_total"] + row["DAO"]
             )
             result_dict["total_mint_proposer"] += (
-                network_macro["mint_share"]["Validator"] * result_dict["Chains"][row["Chain"]]["burn_total"]
+                network_macro["mint_share"]["Validator"] * result_dict["services"][row["Chain"]]["burn_total"]
                 + row["Validators"]
             )
             result_dict["total_mint_supplier"] += (
-                network_macro["mint_share"]["Supplier"] * result_dict["Chains"][row["Chain"]]["burn_total"]
+                network_macro["mint_share"]["Supplier"] * result_dict["services"][row["Chain"]]["burn_total"]
                 + row["Suppliers"]
             )
             result_dict["total_mint_source"] += (
-                network_macro["mint_share"]["Source"] * result_dict["Chains"][row["Chain"]]["burn_total"]
+                network_macro["mint_share"]["Source"] * result_dict["services"][row["Chain"]]["burn_total"]
                 + row["reward_sources_boost"]
             )
 

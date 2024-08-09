@@ -12,11 +12,6 @@ class Condition:
     low_threshold: float
     high_threshold: float
 
-# Report card: how well you did
-# Punch card: how much you did -> EMA of # relays
-# -> Low -> shitty job based on off chain (implcit QoS)
-# -> high -> good job based on off chain (implicit QoS)
-
 
 @dataclass
 class Point:
@@ -51,6 +46,13 @@ class TLMBoost:
     conditions: List[Condition]
     minting_func: Callable
     parameters: Parameters
+
+
+# TODO_FUTURE:
+#  1. report card how well you did
+#  2. punch card: how much you did -> EMA of # relays
+#   -> Low -> shitty job based on off chain (implicit QoS)
+#   -> high -> good job based on off chain (implicit QoS)
 
 
 def boost_cuttm_f_CUs_nonlinear(tlm_per_service_df: pd.DataFrame, network_macro: dict, params: dict) -> pd.Series:
@@ -99,8 +101,6 @@ def boost_cuttm_f_CUs_nonlinear(tlm_per_service_df: pd.DataFrame, network_macro:
     # The same as the core TLM (or any TLM) this value will be potentially reduced
     return param_use * tlm_per_service_df["cu_per_node"] * tlm_per_service_df["active_nodes"]
 
-
-# Instances of TLMBoost with the new Budget dataclass
 
 dao_boost = TLMBoost(
     name="DAO Boost",
