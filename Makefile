@@ -56,7 +56,7 @@ py_format: check-env  ## Format the python code
 
 .PHONY: marimo_edit_tokenomics_compare
 marimo_edit_tokenomics_compare: check-env  ## Edit the tokenomics compare notebook
-	cd notebooks && marimo edit Tokenomics_compare_marimo.py
+	cd notebooks && marimo edit tokenomics_simplified_marimo.py
 
 ####################
 ### Your stuff   ###
