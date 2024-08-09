@@ -132,7 +132,7 @@ def process(
 ########################## Configuration Structure #############################
 ################################################################################
 
-# default_parameters_dict is a big structure that contains:
+# global_params_dict is a big structure that contains:
 # 1. Global parameters
 # 2. Definitions for the various TLMs
 global_params_dict = dict()

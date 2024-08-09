@@ -330,8 +330,8 @@ def process(data_df: pd.DataFrame, network_macro: dict, params: dict) -> Tuple[p
             # Add to the global accumulators (all services)
             result_dict["total_mint"] += result_dict["Chains"][row["Chain"]]["mint_total"]
             result_dict["total_burn"] += result_dict["Chains"][row["Chain"]]["burn_total"]
-            # result_dict['total_mint_base'] += result_dict['Chains'][row['Chain']]['mint_base']
-            # result_dict['total_mint_others'] += result_dict['Chains'][row['Chain']]['mint_boost_sources']
+            # result_dict['total_mint_base'] += result_dict['services'][row['Chain']]['mint_base']
+            # result_dict['total_mint_others'] += result_dict['services'][row['Chain']]['mint_boost_sources']
             result_dict["total_mint_dao"] += (
                 network_macro["mint_share"]["DAO"] * result_dict["Chains"][row["Chain"]]["burn_total"] + row["DAO"]
             )
