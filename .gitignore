@@ -3,3 +3,4 @@ untracked
 __pycache__
 venv
 .DS_store
+.venv

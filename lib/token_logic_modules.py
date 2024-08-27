@@ -113,17 +113,59 @@ def process(
 
     # Execute all TLM boosts
     for boost_tlm in global_params_dict["boost_TLM"]:
+        skip = False
         for condition in boost_tlm.conditions:
             if (network_macro[condition.metric] < condition.low_threshold) or (
                 network_macro[condition.metric] > condition.high_threshold
             ):
-                continue
+                skip = True
 
-        # Get this boost budget
-        boost_mint = boost_tlm.minting_func(services_df, network_macro, boost_tlm.parameters)
-        assert boost_mint.sum() > 0
-        # Assign to actor
-        services_df[f"mint_{boost_tlm.actor}"] += boost_mint
+        if not skip:
+            # Get this boost budget
+            boost_mint = boost_tlm.minting_func(services_df, network_macro, boost_tlm.parameters)
+            assert boost_mint.sum() > 0
+            # Assign to actor
+            services_df[f"mint_{boost_tlm.actor}"] += boost_mint
+
+    # total CUs processed
+    daily_CUs = (services_df["relays"]*services_df["cu_per_relay"]).sum()
+    ##### Complete the results entry
+    for idx, row in services_df.iterrows():
+        if row["relays"] > 0:
+
+            # Results entry for this service
+            tlm_results["services"][row["Chain"]] = dict()
+
+            ##### Complete the results entry
+            # How much we minted here due to work
+            tlm_results["services"][row["Chain"]]["mint_base"] = row["core_TLM_mint"]
+            # How much we burnt here
+            tlm_results["services"][row["Chain"]]["burn_total"] = row["core_TLM_burnt"]
+            # How much extra we mint for sources
+            tlm_results["services"][row["Chain"]][
+                "mint_boost_sources"
+            ] = 0  # TODO: Not implemented actually
+            # Total mint
+            tlm_results["services"][row["Chain"]]["mint_total"] = (
+                row['core_TLM_mint']+row['mint_DAO']+row['mint_Validator']+row['mint_Supplier']+row['mint_Source']
+            )
+            # Calculate the minting per node in this service
+            tlm_results["services"][row["Chain"]]["mint_per_node"] = tlm_results["services"][row["Chain"]]["mint_total"] / row["active_nodes"]
+            # Calculate the imbalance
+            tlm_results["services"][row["Chain"]]["service_imbalance"] = (row["cu_per_node"]) / (
+                daily_CUs / network_macro["supplier_nodes"]
+            )
+
+
+
+            tlm_results["total_mint"] += tlm_results["services"][row["Chain"]]["mint_total"]
+            tlm_results["total_burn"] += tlm_results["services"][row["Chain"]]["burn_total"]
+            tlm_results["total_mint_dao"] += row['mint_DAO'] + network_macro["mint_share"]["DAO"] * row['core_TLM_mint']
+            tlm_results["total_mint_proposer"] += row['mint_Validator'] + network_macro["mint_share"]["Validator"] * row['core_TLM_mint']
+            tlm_results["total_mint_supplier"] += row['mint_Supplier'] + network_macro["mint_share"]["Supplier"] * row['core_TLM_mint']
+            tlm_results["total_mint_source"] += row['mint_Source'] + network_macro["mint_share"]["Source"] * row['core_TLM_mint']
+
+
 
     return services_df, tlm_results
 
